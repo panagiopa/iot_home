@@ -72,11 +72,7 @@ extern "C"
 //
 //*****************************************************************************
 #define APP_TICKS_PER_SEC                   100
-#define APP_INPUT_BUF_SIZE                  1024
 #define NUM_STATS                           12
-
-void PrintAllData(void);
-bool ProvisionCIK(void);
 
 //*****************************************************************************
 //
@@ -107,19 +103,9 @@ extern tStat g_sBoardState;
 extern tStat g_sContactEmail;
 extern tStat g_sAlert;
 
-extern char g_cInput[APP_INPUT_BUF_SIZE];
-
-extern bool g_bPrintingData;
-extern bool g_bGameActive;
-extern volatile bool g_bOnline;
-extern uint32_t g_ui32LinkRetries;
-
 extern uint32_t g_ui32SysClock;
 
-extern void PrintMac(void);
-extern void PrintStats(tStat **psStats);
-extern void PrintConnectionHelp(void);
-extern bool LocateValidCIK(void);
+
 
 //*****************************************************************************
 //
