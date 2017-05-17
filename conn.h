@@ -1,10 +1,14 @@
 #ifndef __CONN_H_
 #define __CONN_H__
 
+#include "git/home_iot.h"
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
+#include "utils/uartstdio.h"
 #include "stats.h"
-#include "git/home_iot.h"
+#include "drivers/eth_client_lwip.h"
+#include "exosite.h"
 //*****************************************************************************
 //
 // Global macro definitions.
@@ -27,8 +31,7 @@ extern void PrintStats(tStat **psStats);
 extern void PrintConnectionHelp(void);
 extern bool LocateValidCIK(void);
 
-
-
-
+void
+CheckForUserCommands(void);
 
 #endif

@@ -22,8 +22,15 @@
 //
 //*****************************************************************************
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
 #include "git/home_iot.h"
 #include "git/conn.h"
+#include "git/init_peripherals.h"
+#include "git/cmd_peripherals.h"
+
 
 
 //*****************************************************************************
@@ -82,6 +89,7 @@ __error__(char *pcFilename, uint32_t ui32Line)
 }
 #endif
 
+
 // #define CUSTOM_PROXY
 // #define PROXY_ADDRESS           "your.proxy.address"
 // #define PROXY_PORT              80
@@ -126,7 +134,7 @@ tStat g_sSecondsOnTime =
     {"Time since reset", &g_ui32SecondsOnTime, "ontime", INT, WRITE_ONLY};
 
 tStat g_sLEDD1 =
-    {"LED D1", &g_ui32LEDD1, "ledd1", INT, READ_WRITE};
+    { "LED D1", &g_ui32LEDD1, "ledd1", INT, READ_WRITE};
 
 tStat g_sLEDD2 =
     {"LED D2", &g_ui32LEDD2, "ledd2", INT, READ_WRITE};
@@ -176,8 +184,6 @@ uint32_t g_ui32SysClock = 0;
 //*****************************************************************************
 uint32_t g_ui32IPAddr;
 
-
-
 //*****************************************************************************
 //
 // Global variables to keep track of the error conditions.
@@ -191,257 +197,6 @@ enum
     ERR_NO_ERR
 } g_ui32Err = ERR_NO_ERR;
 
-
-
-
-
-#define NORMAL 0
-#define NORMAL_MOTION_OFF 1
-#define ALARM 2
-
-#define THEFT_ALARM_MOTION 1    // MOTION
-
-#define RELE_ON 0x0U
-#define RELE_OFF 0x1U
-
-#define PIN0 0x00U
-#define PIN1 0x01U
-#define PIN2 0x02U
-#define PIN3 0x03U
-#define PIN4 0x04U
-#define PIN5 0x05U
-#define PIN6 0x06U
-#define PIN7 0x07U
-
-#define CMD1_ON 0x01
-#define CMD2_ON 0x02
-
-void init_peripherals(void)
-{
-    uint8_t PIO_L_SWITCH = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3;
-    ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOL);
-    /* enable clock for GPIOA -> TURN ON -> TAKE 3 CYCLES ENABLE FIRST*/
-
-    /* APB = Advanced Peripherals Bus
-     * AHB = Advanced High-Performance Bus
-     * APB for low energy
-     *  PORT_L IS IN AHB
-     */
-    ROM_GPIOPinTypeGPIOOutput(GPIO_PORTL_BASE, PIO_L_SWITCH);
-    /* OFF RELE */
-    ROM_GPIOPinWrite(GPIO_PORTL_BASE, PIO_L_SWITCH, 0XF);
-
-
-    /* Motion SENSOR INPUT PIN 0 */
-    ROM_GPIOPinTypeGPIOInput(GPIO_PORTL_BASE, GPIO_PIN_5);
-
-}
-
-void CheckToggleRelayCMD(void)
-{
-    if(g_ToggleRelayCMD == CMD1_ON)
-    {
-        uint32_t input = GPIOPinRead(GPIO_PORTL_BASE, GPIO_PIN_0) & GPIO_PIN_0;
-        if(input & GPIO_PIN_0)// off rele 1
-        {
-            //ON rele 1
-            GPIOPinWrite(GPIO_PORTL_BASE, GPIO_PIN_0, 0x00);
-        }else
-        {
-            //on buzzer
-            GPIOPinWrite(GPIO_PORTL_BASE, GPIO_PIN_0, 0x01);
-        }
-
-        g_ToggleRelayCMD = 0x0;
-        /* force to write not read */
-        g_sToggleRelayCMD.eReadWriteType = READ_WRITE;
-    }
-    else if(g_ToggleRelayCMD == CMD2_ON)
-    {
-        uint32_t input = GPIOPinRead(GPIO_PORTL_BASE, GPIO_PIN_1) & GPIO_PIN_1;
-        if(input & GPIO_PIN_1)// off rele 1
-        {
-            //ON rele 1
-            GPIOPinWrite(GPIO_PORTL_BASE, GPIO_PIN_1, 0x00);
-        }else
-        {
-            //on buzzer
-            GPIOPinWrite(GPIO_PORTL_BASE, GPIO_PIN_1, 0x01 << PIN1);
-        }
-
-        g_ToggleRelayCMD = 0x0;
-        /* force to write not read */
-        g_sToggleRelayCMD.eReadWriteType = READ_WRITE;
-    }
-
-    g_rele1state = (GPIOPinRead(GPIO_PORTL_BASE, GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3))& (0x0F);
-
-}
-
-//*****************************************************************************
-//
-// Takes a reading from the internal temperature sensor, and updates the
-// corresponding global statistics.
-//
-//*****************************************************************************
-void
-UpdateInternalTemp(void)
-{
-    uint32_t pui32ADC0Value[1], ui32TempValueC, ui32TempValueF;
-
-    //
-    // Take a temperature reading with the ADC.
-    //
-    ROM_ADCProcessorTrigger(ADC0_BASE, 3);
-
-    //
-    // Wait for the ADC to finish taking the sample
-    //
-    while(!ROM_ADCIntStatus(ADC0_BASE, 3, false))
-    {
-    }
-
-    //
-    // Clear the interrupt
-    //
-    ROM_ADCIntClear(ADC0_BASE, 3);
-
-    //
-    // Read the analog voltage measurement.
-    //
-    ROM_ADCSequenceDataGet(ADC0_BASE, 3, pui32ADC0Value);
-
-    //
-    // Convert the measurement to degrees Celcius and Fahrenheit, and save to
-    // the global state variables.
-    //
-    ui32TempValueC = ((1475 * 4096) - (2250 * pui32ADC0Value[0])) / 40960;
-    g_ui32InternalTempC = ui32TempValueC;
-    ui32TempValueF = ((ui32TempValueC * 9) + 160) / 5;
-    g_ui32InternalTempF = ui32TempValueF;
-}
-
-//*****************************************************************************
-//
-// Polls the buttons, and updates global state accordingly.
-//
-//*****************************************************************************
-void
-UpdateButtons(void)
-{
-    uint8_t ui8Buttons, ui8ButtonsChanged;
-
-    //
-    // Check the current debounced state of the buttons.
-    //
-    ui8Buttons = ButtonsPoll(&ui8ButtonsChanged,0);
-
-    //
-    // If either button has been pressed, record that status to the
-    // corresponding global variable.
-    //
-    if(BUTTON_PRESSED(USR_SW1, ui8Buttons, ui8ButtonsChanged))
-    {
-        g_ui32SW1Presses++;
-    }
-    else if(BUTTON_PRESSED(USR_SW2, ui8Buttons, ui8ButtonsChanged))
-    {
-        g_ui32SW2Presses++;
-    }
-}
-
-//*****************************************************************************
-//
-// Turns LEDs on or off based on global state variables.
-//
-//*****************************************************************************
-void
-UpdateLEDs(void)
-{
-    //
-    // If either LED's global flag is set, turn that LED on. Otherwise, turn
-    // them off.
-    //
-    if(g_ui32LEDD1)
-    {
-        ROM_GPIOPinWrite(GPIO_PORTN_BASE, GPIO_PIN_1, GPIO_PIN_1);
-    }
-    else
-    {
-        ROM_GPIOPinWrite(GPIO_PORTN_BASE, GPIO_PIN_1, 0);
-    }
-
-    if(g_ui32LEDD2)
-    {
-        ROM_GPIOPinWrite(GPIO_PORTN_BASE, GPIO_PIN_0, GPIO_PIN_0);
-    }
-    else
-    {
-        ROM_GPIOPinWrite(GPIO_PORTN_BASE, GPIO_PIN_0, 0);
-    }
-}
-
-//*****************************************************************************
-//
-// Prompts the user for a command, and blocks while waiting for the user's
-// input. This function will return after the execution of a single command.
-//
-//*****************************************************************************
-void
-CheckForUserCommands(void)
-{
-    int iStatus;
-
-    //
-    // Peek to see if a full command is ready for processing
-    //
-    if(UARTPeek('\r') == -1)
-    {
-        //
-        // If not, return so other functions get a chance to run.
-        //
-        return;
-    }
-
-    //
-    // If we do have commands, process them immediately in the order they were
-    // received.
-    //
-    while(UARTPeek('\r') != -1)
-    {
-        //
-        // Get a user command back
-        //
-        UARTgets(g_cInput, APP_INPUT_BUF_SIZE);
-
-        //
-        // Process the received command
-        //
-        iStatus = CmdLineProcess(g_cInput);
-
-        //
-        // Handle the case of bad command.
-        //
-        if(iStatus == CMDLINE_BAD_CMD)
-        {
-            UARTprintf("Bad command!\n");
-        }
-
-        //
-        // Handle the case of too many arguments.
-        //
-        else if(iStatus == CMDLINE_TOO_MANY_ARGS)
-        {
-            UARTprintf("Too many arguments for command processor!\n");
-        }
-    }
-
-    //
-    // Print a prompt
-    //
-    UARTprintf("\n> ");
-
-}
 
 uint32_t SecondsCounterLAMP = 0;
 //*****************************************************************************
@@ -583,51 +338,9 @@ ConfigureTimer0(void)
     ROM_IntEnable(INT_TIMER0A);
     ROM_TimerIntEnable(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
 }
-
-//*****************************************************************************
-//
-// Enables and configures ADC0 to read the internal temperature sensor into
-// sample sequencer 3.
-//
-//*****************************************************************************
-void
-ConfigureADC0(void)
-{
-    //
-    // Enable clock to ADC0.
-    //
-    ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC0);
-
-    //
-    // Configure ADC0 Sample Sequencer 3 for processor trigger operation.
-    //
-    ROM_ADCSequenceConfigure(ADC0_BASE, 3, ADC_TRIGGER_PROCESSOR, 0);
-
-    //
-    // Increase the hold time of this sample sequencer to account for the
-    // temperature sensor erratum (ADC#09).
-    //
-    HWREG(ADC0_BASE + ADC_O_SSTSH3) = 0x4;
-
-    //
-    // Configure ADC0 sequencer 3 for a single sample of the temperature
-    // sensor.
-    //
-    ROM_ADCSequenceStepConfigure(ADC0_BASE, 3, 0, ADC_CTL_TS | ADC_CTL_IE |
-                                 ADC_CTL_END);
-
-    //
-    // Enable the sequencer.
-    //
-    ROM_ADCSequenceEnable(ADC0_BASE, 3);
-
-    //
-    // Clear the interrupt bit for sequencer 3 to make sure it is not set
-    // before the first sample is taken.
-    //
-    ROM_ADCIntClear(ADC0_BASE, 3);
+#ifdef __cplusplus
 }
-
+#endif
 //*****************************************************************************
 //
 // Main function.
@@ -1054,4 +767,6 @@ main(void)
             }
         }
     }
+
 }
+

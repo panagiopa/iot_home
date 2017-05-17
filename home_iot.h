@@ -89,7 +89,8 @@ extern uint32_t g_ui32TimerIntCount;
 extern uint32_t g_ui32SecondsOnTime;
 extern uint32_t g_ui32LEDD1;
 extern uint32_t g_ui32LEDD2;
-
+extern uint32_t g_ToggleRelayCMD;
+extern uint32_t g_rele1state;
 extern char g_pcLocation[50];
 extern char g_pcContactEmail[100];
 extern char g_pcAlert[140];
@@ -102,6 +103,7 @@ extern tStat g_sLocation;
 extern tStat g_sBoardState;
 extern tStat g_sContactEmail;
 extern tStat g_sAlert;
+extern tStat g_sToggleRelayCMD;
 
 extern uint32_t g_ui32SysClock;
 

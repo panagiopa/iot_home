@@ -1,12 +1,5 @@
-#include <git/conn.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <string.h>
-#include "utils/uartstdio.h"
-#include "stats.h"
-#include "drivers/eth_client_lwip.h"
-#include "exosite.h"
-#include "git/home_iot.h"
+#include "git/conn.h"
+
 //*****************************************************************************
 //
 // Flags to keep track of application state.
@@ -395,4 +388,66 @@ LocateValidCIK(void)
         //
         return false;
     }
+}
+
+//*****************************************************************************
+//
+// Prompts the user for a command, and blocks while waiting for the user's
+// input. This function will return after the execution of a single command.
+//
+//*****************************************************************************
+void
+CheckForUserCommands(void)
+{
+    int iStatus;
+
+    //
+    // Peek to see if a full command is ready for processing
+    //
+    if(UARTPeek('\r') == -1)
+    {
+        //
+        // If not, return so other functions get a chance to run.
+        //
+        return;
+    }
+
+    //
+    // If we do have commands, process them immediately in the order they were
+    // received.
+    //
+    while(UARTPeek('\r') != -1)
+    {
+        //
+        // Get a user command back
+        //
+        UARTgets(g_cInput, APP_INPUT_BUF_SIZE);
+
+        //
+        // Process the received command
+        //
+        iStatus = CmdLineProcess(g_cInput);
+
+        //
+        // Handle the case of bad command.
+        //
+        if(iStatus == CMDLINE_BAD_CMD)
+        {
+            UARTprintf("Bad command!\n");
+        }
+
+        //
+        // Handle the case of too many arguments.
+        //
+        else if(iStatus == CMDLINE_TOO_MANY_ARGS)
+        {
+            UARTprintf("Too many arguments for command processor!\n");
+        }
+    }
+
+    //
+    // Print a prompt
+    //
+    UARTprintf("\n> ");
+
 }
